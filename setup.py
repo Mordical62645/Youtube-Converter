@@ -1,10 +1,18 @@
 from cx_Freeze import setup, Executable
 import os
 
-assert os.path.isfile("C:\\Users\\PC\\Documents\\Projects\\youtube_converter\\main.py"), "Python script not found!"
-assert os.path.isfile("C:\\Users\\PC\\Documents\\Projects\\youtube_converter\\icon.ico"), "Icon file not found!"
+# Get current directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
-additional_files = [("ffmpeg.exe", "ffmpeg.exe"), ("ffprobe.exe", "ffprobe.exe")]
+assert os.path.isfile(os.path.join(current_dir, "main.py")), "Python script not found!"
+assert os.path.isfile(os.path.join(current_dir, "icon.ico")), "Icon file not found!"
+
+# FFmpeg files are in the ffmpeg-master-latest-win64-gpl-shared/bin directory
+ffmpeg_dir = os.path.join(current_dir, "ffmpeg-master-latest-win64-gpl-shared", "bin")
+additional_files = [
+    (os.path.join(ffmpeg_dir, "ffmpeg.exe"), "ffmpeg.exe"), 
+    (os.path.join(ffmpeg_dir, "ffprobe.exe"), "ffprobe.exe")
+]
 
 base = None
 if os.name == 'nt':
@@ -12,9 +20,9 @@ if os.name == 'nt':
 
 executables = [
     Executable(
-        "C:\\Users\\PC\\Documents\\Projects\\youtube_converter\\main.py", 
+        os.path.join(current_dir, "main.py"), 
         base=base,
-        icon="C:\\Users\\PC\\Documents\\Projects\\youtube_converter\\icon.ico")
+        icon=os.path.join(current_dir, "icon.ico"))
 ]
 
 setup(

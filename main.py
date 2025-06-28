@@ -30,10 +30,32 @@ def get_resource_path(resource_name):
         base_path = os.path.dirname(__file__)
     return os.path.join(base_path, resource_name)
 
-ffmpeg_path = get_resource_path('ffmpeg-master-latest-win64-gpl-shared/bin/ffmpeg.exe')
-ffprobe_path = get_resource_path('ffmpeg-master-latest-win64-gpl-shared/bin/ffprobe.exe')
+# Try different possible ffmpeg paths
+def find_ffmpeg():
+    if getattr(sys, 'frozen', False):
+        # When frozen (executable), ffmpeg files are in the same directory as the exe
+        base_path = sys._MEIPASS if hasattr(sys, '_MEIPASS') else os.path.dirname(sys.executable)
+        ffmpeg_path = os.path.join(base_path, 'ffmpeg.exe')
+        ffprobe_path = os.path.join(base_path, 'ffprobe.exe')
+    else:
+        # When running from source, ffmpeg files are in the nested directory
+        base_path = os.path.dirname(__file__)
+        ffmpeg_path = os.path.join(base_path, 'ffmpeg-master-latest-win64-gpl-shared', 'bin', 'ffmpeg.exe')
+        ffprobe_path = os.path.join(base_path, 'ffmpeg-master-latest-win64-gpl-shared', 'bin', 'ffprobe.exe')
+    
+    # Verify the files exist
+    if not os.path.exists(ffmpeg_path):
+        console.print(f"[bold red]Error: FFmpeg not found at {ffmpeg_path}[/bold red]")
+        return None, None
+    if not os.path.exists(ffprobe_path):
+        console.print(f"[bold red]Error: FFprobe not found at {ffprobe_path}[/bold red]")
+        return None, None
+    
+    return ffmpeg_path, ffprobe_path
 
-if AudioSegment is not None:
+ffmpeg_path, ffprobe_path = find_ffmpeg()
+
+if AudioSegment is not None and ffmpeg_path and ffprobe_path:
     AudioSegment.converter = ffmpeg_path
     AudioSegment.ffmpeg = ffmpeg_path
     AudioSegment.avconv = ffmpeg_path
@@ -49,6 +71,12 @@ def sanitize_filename(filename):
 
 def conv_MP3():
     import subprocess
+    
+    # Check if ffmpeg is available
+    if not ffmpeg_path:
+        console.print("[bold red]Error: FFmpeg not found. Cannot convert to MP3.[/bold red]")
+        return options_()
+    
     while True:
         link = console.input("[bold green]link: ")
         if link.startswith("https://www.youtube.com/watch?v=") or link.startswith("https://youtu.be/"):
@@ -138,6 +166,12 @@ def conv_MP3():
 
 def conv_MP4():
     import subprocess
+    
+    # Check if ffmpeg is available
+    if not ffmpeg_path:
+        console.print("[bold red]Error: FFmpeg not found. Cannot convert to MP4.[/bold red]")
+        return options_()
+    
     while True:
         link = console.input("[bold green]link: ")
         if link.startswith("https://www.youtube.com/watch?v=") or link.startswith("https://youtu.be/"):
