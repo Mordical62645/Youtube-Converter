@@ -66,8 +66,22 @@ home = os.path.expanduser("~")
 download_path = os.path.join(home, "Downloads")
 
 def sanitize_filename(filename):
-    sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
-    return sanitized
+    # Check if filename contains non-English characters (including Korean, Chinese, etc.)
+    # This regex matches any character that's not a basic Latin letter, digit, or common punctuation
+    if re.search(r'[^\x00-\x7F]', filename):
+        # If it contains non-ASCII characters, use timestamp format
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%m-%d-%Y_%H-%M-%S")
+        return f"YouTubeConvertedFile_{timestamp}"
+    else:
+        # If it's ASCII-only, just remove Windows-invalid characters
+        sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
+        # Remove extra whitespace and replace with single space
+        sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+        # Limit length to avoid path issues
+        if len(sanitized) > 100:
+            sanitized = sanitized[:100]
+        return sanitized
 
 def conv_MP3():
     import subprocess
@@ -89,10 +103,12 @@ def conv_MP3():
                 video_id = link
             
             options = {
-                'format': 'bestaudio/best',
+                'format': 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best',
                 'outtmpl': os.path.join(download_path, "%(title)s.%(ext)s"),
                 'compat_opts': ['filename-sanitization'],
-                'noplaylist': True
+                'noplaylist': True,
+                'no_warnings': True,
+                'quiet': True
             }
 
             try:
@@ -105,18 +121,47 @@ def conv_MP3():
                     # Download the file
                     ydl.download([video_id])
                     
-                    # Look for the downloaded file with different extensions
-                    possible_extensions = ['.webm', '.mp4', '.m4a', '.opus']
+                    # Look for the downloaded file more robustly
                     downloaded_file = None
+                    possible_extensions = ['.webm', '.mp4', '.m4a', '.opus']
                     
+                    # First try exact match with sanitized title
                     for ext in possible_extensions:
                         test_path = os.path.join(download_path, f"{sanitized_title}{ext}")
                         if os.path.exists(test_path):
                             downloaded_file = test_path
                             break
                     
+                    # If not found, search for files containing the sanitized title
+                    if not downloaded_file:
+                        for file in os.listdir(download_path):
+                            file_path = os.path.join(download_path, file)
+                            if os.path.isfile(file_path):
+                                file_lower = file.lower()
+                                title_lower = sanitized_title.lower()
+                                # Check if file contains the title and has a valid extension
+                                if any(file_lower.endswith(ext) for ext in possible_extensions) and title_lower in file_lower:
+                                    downloaded_file = file_path
+                                    break
+                    
+                    # If still not found, try to find the most recent file with valid extension
+                    if not downloaded_file:
+                        recent_files = []
+                        for file in os.listdir(download_path):
+                            file_path = os.path.join(download_path, file)
+                            if os.path.isfile(file_path) and any(file.lower().endswith(ext) for ext in possible_extensions):
+                                recent_files.append((file_path, os.path.getctime(file_path)))
+                        
+                        if recent_files:
+                            # Sort by creation time (most recent first)
+                            recent_files.sort(key=lambda x: x[1], reverse=True)
+                            downloaded_file = recent_files[0][0]
+                            console.print(f"[yellow]Using most recent downloaded file: {os.path.basename(downloaded_file)}[/yellow]")
+                    
                     if downloaded_file:
-                        mp3_file_path = os.path.splitext(downloaded_file)[0] + ".mp3"
+                        # Create a safe filename for the MP3 output
+                        safe_filename = sanitize_filename(video_title)
+                        mp3_file_path = os.path.join(download_path, f"{safe_filename}.mp3")
                         
                         # Check if MP3 already exists
                         if os.path.exists(mp3_file_path):
@@ -128,7 +173,8 @@ def conv_MP3():
                                 ffmpeg_path, '-i', downloaded_file, 
                                 '-acodec', 'libmp3lame', '-ab', '192k', 
                                 mp3_file_path, '-y'
-                            ], capture_output=True, text=True)
+                            ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
+                            
                             # Check if MP3 was created and is nonzero size
                             if os.path.exists(mp3_file_path) and os.path.getsize(mp3_file_path) > 0:
                                 os.remove(downloaded_file)  # Remove original file
@@ -184,21 +230,55 @@ def conv_MP4():
                 video_id = link
             
             options = {
-                'format': 'bestvideo+bestaudio/best',
+                'format': 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
                 'outtmpl': os.path.join(download_path, "%(title)s.%(ext)s"),
                 'merge_output_format': 'mp4',
                 'compat_opts': ['filename-sanitization'],
                 'noplaylist': True,
-                'ffmpeg_location': ffmpeg_path
+                'ffmpeg_location': ffmpeg_path,
+                'no_warnings': True,
+                'quiet': True
             }
 
             try:
                 with ytdlp.YoutubeDL(options) as ydl:
                     info_dict = ydl.extract_info(video_id, download=True)
                     video_title = sanitize_filename(info_dict.get('title', 'Unknown Title'))
-                    video_file_path = os.path.join(download_path, f"{video_title}.mp4")
+                    
+                    # Look for the downloaded MP4 file more robustly
+                    video_file_path = None
+                    
+                    # First try exact match with sanitized title
+                    safe_filename = sanitize_filename(video_title)
+                    exact_path = os.path.join(download_path, f"{safe_filename}.mp4")
+                    if os.path.exists(exact_path):
+                        video_file_path = exact_path
+                    else:
+                        # Search for files containing the title
+                        for file in os.listdir(download_path):
+                            file_path = os.path.join(download_path, file)
+                            if os.path.isfile(file_path) and file.lower().endswith('.mp4'):
+                                file_lower = file.lower()
+                                title_lower = video_title.lower()
+                                if title_lower in file_lower:
+                                    video_file_path = file_path
+                                    break
+                        
+                        # If still not found, use most recent MP4 file
+                        if not video_file_path:
+                            recent_mp4_files = []
+                            for file in os.listdir(download_path):
+                                file_path = os.path.join(download_path, file)
+                                if os.path.isfile(file_path) and file.lower().endswith('.mp4'):
+                                    recent_mp4_files.append((file_path, os.path.getctime(file_path)))
+                            
+                            if recent_mp4_files:
+                                recent_mp4_files.sort(key=lambda x: x[1], reverse=True)
+                                video_file_path = recent_mp4_files[0][0]
+                                console.print(f"[yellow]Using most recent MP4 file: {os.path.basename(video_file_path)}[/yellow]")
 
-                    if os.path.exists(video_file_path):
+                    if video_file_path and os.path.exists(video_file_path):
+                        # Copy file to update timestamps
                         temp_file_path = video_file_path + "_temp"
                         with open(video_file_path, "rb") as src_file:
                             with open(temp_file_path, "wb") as dst_file:
@@ -213,15 +293,15 @@ def conv_MP4():
                         stat = os.stat(video_file_path)
                         console.print()
                         console.print(Panel.fit(
-                            f"[bold green]Title:[/bold green]\t\t\t{video_title}\n"
-                            f"[bold blue]DOWNLOADED:[/bold blue]\t\t{video_title}\n"
+                            f"[bold green]Title:[/bold green]\t\t\t{safe_filename}\n"
+                            f"[bold blue]DOWNLOADED:[/bold blue]\t\t{safe_filename}\n"
                             f"[bold green]Creation time:[/bold green]\t\t{time.ctime(stat.st_ctime)}\n"
                             f"[bold green]Modification time:[/bold green]\t{time.ctime(stat.st_mtime)}\n"
                             f"[bold green]Path:[/bold green] {video_file_path}\n",
                             title="DOWNLOAD INFO", style="bold cyan"
                         ))
                     else:
-                        console.print(f"[bold red]Error:[/bold red] Video file not found at {video_file_path}")
+                        console.print(f"[bold red]Error:[/bold red] Video file not found. Check Downloads folder for MP4 files.")
 
             except Exception as e:
                 console.print(f"[bold red]An error occurred:[/bold red] {e}")
