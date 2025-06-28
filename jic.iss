@@ -61,3 +61,17 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
+[Code]
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = wpReady then
+  begin
+    // Check if FFmpeg files exist in the source
+    if not FileExists('build_output\ffmpeg.exe') then
+    begin
+      MsgBox('Warning: FFmpeg files not found in the source directory. The application may not work properly.', mbInformation, MB_OK);
+    end;
+  end;
+end;
+

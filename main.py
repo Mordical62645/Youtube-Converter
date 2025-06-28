@@ -76,6 +76,16 @@ def find_ffmpeg():
             ffmpeg_path = os.path.join(base_path, 'ffmpeg-master-latest-win64-gpl-shared', 'bin', 'ffmpeg.exe')
             ffprobe_path = os.path.join(base_path, 'ffmpeg-master-latest-win64-gpl-shared', 'bin', 'ffprobe.exe')
     
+    # Additional check: if running as installed application (not frozen but executable in Program Files)
+    if not os.path.exists(ffmpeg_path):
+        # Check if we're running from an installed location (Program Files)
+        exe_dir = os.path.dirname(sys.executable)
+        if "Program Files" in exe_dir or "Program Files (x86)" in exe_dir:
+            # This is likely an installed application
+            ffmpeg_path = os.path.join(exe_dir, 'ffmpeg.exe')
+            ffprobe_path = os.path.join(exe_dir, 'ffprobe.exe')
+            console.print(f"[yellow]Checking installed application path: {exe_dir}[/yellow]")
+    
     # Verify the files exist
     if not os.path.exists(ffmpeg_path):
         console.print(f"[bold red]Error: FFmpeg not found at {ffmpeg_path}[/bold red]")
@@ -447,6 +457,13 @@ def info():
             console.print("[bold red]Invalid input. Please enter 0 to go back to the main menu.[/bold red]")
     
 def main():
+    # Debug information
+    console.print(f"[dim]Debug: Current working directory: {os.getcwd()}[/dim]")
+    console.print(f"[dim]Debug: Executable path: {sys.executable}[/dim]")
+    console.print(f"[dim]Debug: Frozen: {getattr(sys, 'frozen', False)}[/dim]")
+    if hasattr(sys, '_MEIPASS'):
+        console.print(f"[dim]Debug: MEIPASS: {sys._MEIPASS}[/dim]")
+    
     console.print()
     console.print(Panel.fit(
         "[bold white] __ __   ___   __ __  ______  __ __  ____     ___         __   ___   ____   __ __    ___  ____  ______    ___  ____  \n"
