@@ -20,6 +20,10 @@ build_output/
 dist/
 build/
 
+# Setup executables
+YoutubeConverter_WINDOWS_*.exe
+*.exe
+
 # Python cache
 __pycache__/
 *.py[cod]
