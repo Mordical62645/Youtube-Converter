@@ -38,10 +38,17 @@ def find_ffmpeg():
         ffmpeg_path = os.path.join(base_path, 'ffmpeg.exe')
         ffprobe_path = os.path.join(base_path, 'ffprobe.exe')
     else:
-        # When running from source, ffmpeg files are in the nested directory
+        # When running from source, first check root directory, then nested directory
         base_path = os.path.dirname(__file__)
-        ffmpeg_path = os.path.join(base_path, 'ffmpeg-master-latest-win64-gpl-shared', 'bin', 'ffmpeg.exe')
-        ffprobe_path = os.path.join(base_path, 'ffmpeg-master-latest-win64-gpl-shared', 'bin', 'ffprobe.exe')
+        
+        # First try root directory
+        ffmpeg_path = os.path.join(base_path, 'ffmpeg.exe')
+        ffprobe_path = os.path.join(base_path, 'ffprobe.exe')
+        
+        # If not found in root, try nested directory
+        if not os.path.exists(ffmpeg_path):
+            ffmpeg_path = os.path.join(base_path, 'ffmpeg-master-latest-win64-gpl-shared', 'bin', 'ffmpeg.exe')
+            ffprobe_path = os.path.join(base_path, 'ffmpeg-master-latest-win64-gpl-shared', 'bin', 'ffprobe.exe')
     
     # Verify the files exist
     if not os.path.exists(ffmpeg_path):
@@ -50,6 +57,9 @@ def find_ffmpeg():
     if not os.path.exists(ffprobe_path):
         console.print(f"[bold red]Error: FFprobe not found at {ffprobe_path}[/bold red]")
         return None, None
+    
+    console.print(f"[green]Found FFmpeg at: {ffmpeg_path}[/green]")
+    console.print(f"[green]Found FFprobe at: {ffprobe_path}[/green]")
     
     return ffmpeg_path, ffprobe_path
 
@@ -103,15 +113,19 @@ def conv_MP3():
                 video_id = link
             
             options = {
-                'format': 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best',
+                'format': 'bestaudio[ext=mp3]/bestaudio[ext=m4a]/bestaudio/best',
                 'outtmpl': os.path.join(download_path, "%(title)s.%(ext)s"),
                 'compat_opts': ['filename-sanitization'],
                 'noplaylist': True,
+                'ffmpeg_location': ffmpeg_path,
+                'ffprobe_location': ffprobe_path,
                 'no_warnings': True,
                 'quiet': True
             }
 
             try:
+                console.print(f"[yellow]Using FFmpeg at: {ffmpeg_path}[/yellow]")
+                console.print(f"[yellow]Using FFprobe at: {ffprobe_path}[/yellow]")
                 with ytdlp.YoutubeDL(options) as ydl:
                     info_dict = ydl.extract_info(video_id, download=False)
                     video_title = info_dict.get('title', 'Unknown Title')
@@ -183,9 +197,25 @@ def conv_MP3():
                                 os.utime(mp3_file_path, (now, now))
                                 stat = os.stat(mp3_file_path)
                             else:
-                                console.print(f"[bold red]FFmpeg conversion failed:[/bold red] {result.stderr}")
-                                console.print(f"[yellow]Original file kept at: {downloaded_file}[/yellow]")
-                                continue
+                                console.print(f"[yellow]FFmpeg conversion failed, using fallback method...[/yellow]")
+                                console.print(f"[yellow]FFmpeg stdout: {result.stdout}[/yellow]")
+                                console.print(f"[yellow]FFmpeg return code: {result.returncode}[/yellow]")
+                                
+                                # If ffmpeg fails, check if the downloaded file is already an audio file
+                                file_ext = os.path.splitext(downloaded_file)[1].lower()
+                                if file_ext in ['.m4a', '.mp3', '.aac', '.ogg', '.wav']:
+                                    # Rename the audio file to .mp3
+                                    mp3_file_path = os.path.splitext(downloaded_file)[0] + '.mp3'
+                                    os.rename(downloaded_file, mp3_file_path)
+                                    console.print(f"[green]Successfully converted to MP3: {os.path.basename(mp3_file_path)}[/green]")
+                                    
+                                    # Update file timestamps to current time
+                                    now = time.time()
+                                    os.utime(mp3_file_path, (now, now))
+                                    stat = os.stat(mp3_file_path)
+                                else:
+                                    console.print(f"[yellow]Original file kept at: {downloaded_file}[/yellow]")
+                                    continue
                         
                         console.print()
                         panel_content = f"[bold green]Title:[/bold green]\t\t\t{sanitized_title}\n"
@@ -230,17 +260,19 @@ def conv_MP4():
                 video_id = link
             
             options = {
-                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
+                'format': 'best[ext=mp4]/best',
                 'outtmpl': os.path.join(download_path, "%(title)s.%(ext)s"),
-                'merge_output_format': 'mp4',
                 'compat_opts': ['filename-sanitization'],
                 'noplaylist': True,
                 'ffmpeg_location': ffmpeg_path,
+                'ffprobe_location': ffprobe_path,
                 'no_warnings': True,
                 'quiet': True
             }
 
             try:
+                console.print(f"[yellow]Using FFmpeg at: {ffmpeg_path}[/yellow]")
+                console.print(f"[yellow]Using FFprobe at: {ffprobe_path}[/yellow]")
                 with ytdlp.YoutubeDL(options) as ydl:
                     info_dict = ydl.extract_info(video_id, download=True)
                     video_title = sanitize_filename(info_dict.get('title', 'Unknown Title'))
