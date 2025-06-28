@@ -230,7 +230,7 @@ def conv_MP4():
                 video_id = link
             
             options = {
-                'format': 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
                 'outtmpl': os.path.join(download_path, "%(title)s.%(ext)s"),
                 'merge_output_format': 'mp4',
                 'compat_opts': ['filename-sanitization'],
