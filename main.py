@@ -4,31 +4,41 @@ import re
 import time
 import shutil
 import yt_dlp as ytdlp
-from pydub import AudioSegment
 from rich.console import Console
 from rich.text import Text
 from rich.panel import Panel
 
 console = Console()
 
+# Handle pydub import with Python 3.13 compatibility
+try:
+    from pydub import AudioSegment
+except ImportError as e:
+    if "audioop" in str(e) or "pyaudioop" in str(e):
+        # For Python 3.13+, we'll use ffmpeg directly instead of pydub
+        AudioSegment = None
+        console.print("[yellow]Warning: pydub not fully compatible with Python 3.13. Using ffmpeg directly for audio conversion.[/yellow]")
+    else:
+        raise e
+
 os.system("mode con: cols=125")  
 
 def get_resource_path(resource_name):
     if getattr(sys, 'frozen', False):
         base_path = sys._MEIPASS if hasattr(sys, '_MEIPASS') else os.path.dirname(sys.executable)
-
     else:
         base_path = os.path.dirname(__file__)
     return os.path.join(base_path, resource_name)
 
-ffmpeg_path = get_resource_path('ffmpeg.exe')
-ffprobe_path = get_resource_path('ffprobe.exe')
+ffmpeg_path = get_resource_path('ffmpeg-master-latest-win64-gpl-shared/bin/ffmpeg.exe')
+ffprobe_path = get_resource_path('ffmpeg-master-latest-win64-gpl-shared/bin/ffprobe.exe')
 
-AudioSegment.converter = ffmpeg_path
-AudioSegment.ffmpeg = ffmpeg_path
-AudioSegment.avconv = ffmpeg_path
-if hasattr(AudioSegment, 'ffprobe'):
-    AudioSegment.ffprobe = ffprobe_path
+if AudioSegment is not None:
+    AudioSegment.converter = ffmpeg_path
+    AudioSegment.ffmpeg = ffmpeg_path
+    AudioSegment.avconv = ffmpeg_path
+    if hasattr(AudioSegment, 'ffprobe'):
+        AudioSegment.ffprobe = ffprobe_path
 
 home = os.path.expanduser("~")
 download_path = os.path.join(home, "Downloads")
@@ -38,35 +48,70 @@ def sanitize_filename(filename):
     return sanitized
 
 def conv_MP3():
+    import subprocess
     while True:
         link = console.input("[bold green]link: ")
         if link.startswith("https://www.youtube.com/watch?v=") or link.startswith("https://youtu.be/"):
+            # Extract just the video ID to avoid playlist downloads
+            if "&list=" in link:
+                # Remove playlist parameters
+                video_id = link.split("&list=")[0]
+                console.print(f"[yellow]Extracting video from playlist: {video_id}[/yellow]")
+            else:
+                video_id = link
+            
             options = {
                 'format': 'bestaudio/best',
                 'outtmpl': os.path.join(download_path, "%(title)s.%(ext)s"),
-                'compat_opts': ['filename-sanitization']
+                'compat_opts': ['filename-sanitization'],
+                'noplaylist': True
             }
 
             try:
                 with ytdlp.YoutubeDL(options) as ydl:
-                    info_dict = ydl.extract_info(link, download=False)
+                    info_dict = ydl.extract_info(video_id, download=False)
                     video_title = info_dict.get('title', 'Unknown Title')
 
                     sanitized_title = sanitize_filename(video_title)
 
-                    audio_file_path = os.path.join(download_path, f"{sanitized_title}.webm")
+                    # Download the file
+                    ydl.download([video_id])
                     
-                    ydl.download([link])
+                    # Look for the downloaded file with different extensions
+                    possible_extensions = ['.webm', '.mp4', '.m4a', '.opus']
+                    downloaded_file = None
                     
-                    mp3_file_path = os.path.splitext(audio_file_path)[0] + ".mp3"
-
-                    if os.path.exists(audio_file_path):
-                        audio = AudioSegment.from_file(audio_file_path, format="webm")
-                        audio.export(mp3_file_path, format="mp3")
-
-                        os.remove(audio_file_path)
+                    for ext in possible_extensions:
+                        test_path = os.path.join(download_path, f"{sanitized_title}{ext}")
+                        if os.path.exists(test_path):
+                            downloaded_file = test_path
+                            break
+                    
+                    if downloaded_file:
+                        mp3_file_path = os.path.splitext(downloaded_file)[0] + ".mp3"
                         
-                        stat = os.stat(mp3_file_path)
+                        # Check if MP3 already exists
+                        if os.path.exists(mp3_file_path):
+                            console.print(f"[yellow]MP3 file already exists: {mp3_file_path}[/yellow]")
+                            stat = os.stat(mp3_file_path)
+                        else:
+                            console.print(f"[blue]Converting {os.path.basename(downloaded_file)} to MP3...[/blue]")
+                            result = subprocess.run([
+                                ffmpeg_path, '-i', downloaded_file, 
+                                '-acodec', 'libmp3lame', '-ab', '192k', 
+                                mp3_file_path, '-y'
+                            ], capture_output=True, text=True)
+                            # Check if MP3 was created and is nonzero size
+                            if os.path.exists(mp3_file_path) and os.path.getsize(mp3_file_path) > 0:
+                                os.remove(downloaded_file)  # Remove original file
+                                # Set creation and modification time to now
+                                now = time.time()
+                                os.utime(mp3_file_path, (now, now))
+                                stat = os.stat(mp3_file_path)
+                            else:
+                                console.print(f"[bold red]FFmpeg conversion failed:[/bold red] {result.stderr}")
+                                console.print(f"[yellow]Original file kept at: {downloaded_file}[/yellow]")
+                                continue
                         
                         console.print()
                         panel_content = f"[bold green]Title:[/bold green]\t\t\t{sanitized_title}\n"
@@ -75,11 +120,9 @@ def conv_MP3():
                         panel_content += f"[bold green]Modification time:[/bold green]\t{time.ctime(stat.st_mtime)}\n"
                         panel_content += f"[bold green]Path:[/bold green] {mp3_file_path}\n"
 
-                        console.print(Panel.fit(panel_content, title="DOWNLOAD INFO", style="bold cyan"
-                        ))
-
+                        console.print(Panel.fit(panel_content, title="DOWNLOAD INFO", style="bold cyan"))
                     else:
-                        console.print(f"[bold red]Error:[/bold red] Audio file not found at {audio_file_path}")
+                        console.print(f"[bold red]Error:[/bold red] Downloaded file not found. Check Downloads folder for: {sanitized_title}")
 
             except Exception as e:
                 console.print(f"[bold red]An error occurred:[/bold red] {e}")
@@ -94,19 +137,30 @@ def conv_MP3():
             continue
 
 def conv_MP4():
+    import subprocess
     while True:
         link = console.input("[bold green]link: ")
         if link.startswith("https://www.youtube.com/watch?v=") or link.startswith("https://youtu.be/"):
+            # Extract just the video ID to avoid playlist downloads
+            if "&list=" in link:
+                # Remove playlist parameters
+                video_id = link.split("&list=")[0]
+                console.print(f"[yellow]Extracting video from playlist: {video_id}[/yellow]")
+            else:
+                video_id = link
+            
             options = {
                 'format': 'bestvideo+bestaudio/best',
                 'outtmpl': os.path.join(download_path, "%(title)s.%(ext)s"),
                 'merge_output_format': 'mp4',
-                'compat_opts': ['filename-sanitization']  
+                'compat_opts': ['filename-sanitization'],
+                'noplaylist': True,
+                'ffmpeg_location': ffmpeg_path
             }
 
             try:
                 with ytdlp.YoutubeDL(options) as ydl:
-                    info_dict = ydl.extract_info(link, download=True)
+                    info_dict = ydl.extract_info(video_id, download=True)
                     video_title = sanitize_filename(info_dict.get('title', 'Unknown Title'))
                     video_file_path = os.path.join(download_path, f"{video_title}.mp4")
 
@@ -117,7 +171,6 @@ def conv_MP4():
                                 shutil.copyfileobj(src_file, dst_file)
 
                         os.remove(video_file_path)
-
                         os.rename(temp_file_path, video_file_path)
 
                         current_time = time.time()

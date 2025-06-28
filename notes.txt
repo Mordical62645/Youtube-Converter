@@ -1,0 +1,23 @@
+Major Version (1). Increment this when you make incompatible API changes or significant updates that may break backward compatibility.
+Minor Version (0). Increment this when you add functionality in a backward-compatible manner.
+Patch Version (0). Increment this when you make backward-compatible bug fixes.
+
+So, 1.0.0 can be understood as:
+
+1: First official release (major).
+0: No new features added yet (minor).
+0: No bug fixes yet (patch).
+
+Version 1.0.1 
+1. Refactor the code to OOP (use typer)
+2. Run tests
+3. Rebuild the output
+4. Recompile the output
+5. Versioning 
+
+Version 1.1.1 
+1. Add features: Batch download (testing required)
+2. Run tests
+3. Rebuild the output
+4. Recompile the output
+5. Versioning 

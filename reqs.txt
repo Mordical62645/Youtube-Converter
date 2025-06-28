@@ -1,0 +1,5 @@
+yt-dlp
+pydub
+pyaudio
+rich
+cx-Freeze
