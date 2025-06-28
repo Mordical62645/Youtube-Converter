@@ -27,7 +27,7 @@ executables = [
 
 setup(
     name="youtube_converter",
-    version="1.0",
+    version="1.5.0",
     description="Convert YouTube videos to mp3 and mp4!",
     options={
         "build_exe": {

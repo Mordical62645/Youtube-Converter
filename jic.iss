@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Youtube Converter"
-#define MyAppVersion "1.0"
+#define MyAppVersion "1.5.0"
 #define MyAppPublisher "SymbioSymbioSymbioo"
 #define MyAppURL "https://github.com/Mordical62645"
 #define MyAppExeName "main.exe"
@@ -28,12 +28,12 @@ ArchitecturesAllowed=x64compatible
 ; the 64-bit view of the registry.
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
-LicenseFile=C:\Users\PC\Documents\Projects\youtube_converter\license.txt
+LicenseFile=license.txt
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
-OutputDir=C:\Users\PC\Documents\Projects\youtube_converter
-OutputBaseFilename=YoutubeConverter_WINDOWS_1.0_setup
-SetupIconFile=C:\Users\PC\Downloads\Windows_Installer_icon.ico
+OutputDir=.
+OutputBaseFilename=YoutubeConverter_WINDOWS_1.5.0_setup
+SetupIconFile=icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -45,14 +45,13 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "C:\Users\PC\Documents\Projects\youtube_converter\build_output\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\PC\Documents\Projects\youtube_converter\build_output\lib\*"; DestDir: "{app}/lib"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "C:\Users\PC\Documents\Projects\youtube_converter\build_output\ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\PC\Documents\Projects\youtube_converter\build_output\ffprobe.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\PC\Documents\Projects\youtube_converter\build_output\frozen_application_license.txt"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\PC\Documents\Projects\youtube_converter\build_output\python3.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\PC\Documents\Projects\youtube_converter\build_output\python312.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\PC\Documents\Projects\youtube_converter\build_output\README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "build_output\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "build_output\lib\*"; DestDir: "{app}/lib"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "build_output\ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "build_output\ffprobe.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "build_output\frozen_application_license.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "build_output\python313.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
